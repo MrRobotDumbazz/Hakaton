@@ -265,6 +265,52 @@ router.get("/:roomNumber/schedule", authenticateToken, async (req, res) => {
 });
 
 // === ADMIN ROUTES ===
+// Apply authentication and admin authorization to all admin routes
+router.use("/admin", authenticateToken, authorizeRoles("admin"));
+
+/**
+ * @swagger
+ * /api/rooms/admin:
+ *   post:
+ *     summary: Create new room (Admin only)
+ *     tags: [Rooms - Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               roomNumber:
+ *                 type: string
+ *               floor:
+ *                 type: number
+ *               building:
+ *                 type: string
+ *               type:
+ *                 type: string
+ *               capacity:
+ *                 type: number
+ *               equipment:
+ *                 type: string
+ *             required:
+ *               - roomNumber
+ *               - floor
+ *               - type
+ *               - capacity
+ *               - equipment
+ *     responses:
+ *       201:
+ *         description: Room created successfully
+ *       400:
+ *         description: Invalid input or room already exists
+ *       403:
+ *         description: Admin access required
+ *       500:
+ *         description: Server error
+ */
 router.post("/admin", async (req, res) => {
     try {
         const { roomNumber, floor, building, type, capacity, equipment } = req.body;
@@ -528,99 +574,6 @@ router.patch("/admin/bulk-update", async (req, res) => {
         });
     } catch (error) {
         console.error("Error in bulk update:", error);
-        res.status(500).json({ message: "Internal server error" });
-    }
-});
-
-/**
- * @swagger
- * /api/rooms/admin:
- *   post:
- *     summary: Create new room (Admin only)
- *     tags: [Rooms - Admin]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               roomNumber:
- *                 type: string
- *               floor:
- *                 type: number
- *               building:
- *                 type: string
- *               type:
- *                 type: string
- *               capacity:
- *                 type: number
- *               equipment:
- *                 type: string
- *             required:
- *               - roomNumber
- *               - floor
- *               - type
- *               - capacity
- *               - equipment
- *     responses:
- *       201:
- *         description: Room created successfully
- *       400:
- *         description: Invalid input or room already exists
- *       403:
- *         description: Admin access required
- *       500:
- *         description: Server error
- */
-router.post("/admin", async (req, res) => {
-    try {
-        const { roomNumber, floor, building, type, capacity, equipment } = req.body;
-
-        // Validation
-        if (!roomNumber || floor === undefined || !type || capacity === undefined || !equipment) {
-            return res.status(400).json({
-                message: "All fields are required: roomNumber, floor, type, capacity, equipment"
-            });
-        }
-
-        // Check if room already exists
-        const existingRoom = await Room.findOne({ roomNumber });
-        if (existingRoom) {
-            return res.status(400).json({ message: "Room with this number already exists" });
-        }
-
-        const newRoom = new Room({
-            roomNumber,
-            floor: parseInt(floor),
-            building: building || 'Main Building',
-            type,
-            capacity: parseInt(capacity),
-            equipment,
-            updatedBy: req.user._id
-        });
-
-        await newRoom.save();
-
-        // Emit socket event
-        if (req.app.locals.io) {
-            req.app.locals.io.emit('roomCreated', {
-                room: newRoom,
-                createdBy: {
-                    name: `${req.user.firstName} ${req.user.lastName}`,
-                    username: req.user.username
-                }
-            });
-        }
-
-        res.status(201).json({
-            message: "Room created successfully",
-            room: newRoom
-        });
-    } catch (error) {
-        console.error("Error creating room:", error);
         res.status(500).json({ message: "Internal server error" });
     }
 });
